@@ -1,20 +1,21 @@
 {
-  "name": "转盘选择器",
-  "short_name": "转盘",
-  "description": "自定义权重转盘，随机选择小工具",
-  "start_url": "/",
+  "name": "Wheel Spinner",
+  "short_name": "Wheel",
+  "description": "A customizable weighted wheel spinner",
+  "start_url": "./",
+  "scope": "./",
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#f8fafc",
   "theme_color": "#6366f1",
   "icons": [
     {
-      "src": "/icon-192.png",
+      "src": "./icon-192.png",
       "sizes": "192x192",
       "type": "image/png"
     },
     {
-      "src": "/icon-512.png",
+      "src": "./icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
