@@ -1,0 +1,16 @@
+/* Additional imports are in App.css - this file is just for any global overrides */
+
+/* Prevent iOS zoom on input focus */
+@media screen and (max-width: 480px) {
+  input[type="text"],
+  input[type="number"] {
+    font-size: 16px !important;
+  }
+}
+
+/* Safe area for notched iPhones */
+@supports (padding-top: env(safe-area-inset-top)) {
+  .app-header {
+    padding-top: calc(12px + env(safe-area-inset-top));
+  }
+}
