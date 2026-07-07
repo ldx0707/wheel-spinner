@@ -35,7 +35,6 @@ function contrastColor(hex: string): string {
   return (0.299 * r + 0.587 * g + 0.114 * b) / 255 > 0.55 ? '#1e293b' : '#ffffff';
 }
 
-/** Wrap text into lines that fit within maxWidth at given fontSize */
 function wrapText(
   ctx: CanvasRenderingContext2D,
   text: string,
@@ -100,6 +99,7 @@ export function Wheel({
 
   const resultIndexRef = useRef<number>(-1);
   const resultIdRef = useRef<string | null>(null);
+  const landingOffsetRef = useRef(0);
 
   const draw = useCallback(
     (angle: number) => {
@@ -136,7 +136,6 @@ export function Wheel({
         return;
       }
 
-      // Wheel shadow
       ctx.save();
       ctx.shadowColor = 'rgba(0,0,0,0.25)';
       ctx.shadowBlur = 14;
@@ -175,21 +174,17 @@ export function Wheel({
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
 
-        // Arc width at text radius = available width for text (tangential)
         const arcW = a * textR;
-        // Radial space from textR inward toward center (minus hub area)
         const hubR = r * 0.11;
         const radialSpace = r - textR - hubR;
         const maxRadialH = radialSpace * 0.85;
 
-        // Conservative initial font size based on both sector size and radial space
         const baseSz = Math.min(a * r * 0.3, radialSpace * 0.55, 15);
 
         let fontSize = Math.max(7, baseSz);
         let lines: string[] = [opt.name];
         let lineH = fontSize * 1.3;
 
-        // Iteratively reduce font size until text fits
         for (let attempt = 0; attempt < 6; attempt++) {
           const maxTextW = arcW * 0.9;
           lines = wrapText(ctx, opt.name, maxTextW, fontSize);
@@ -201,11 +196,9 @@ export function Wheel({
           fontSize = Math.max(7, fontSize * 0.78);
         }
 
-        // Final clamp
         fontSize = Math.max(7, Math.min(fontSize, 14));
         lineH = fontSize * 1.25;
 
-        // Recompute lines with final font size
         const maxTextW = arcW * 0.9;
         lines = wrapText(ctx, opt.name, maxTextW, fontSize);
 
@@ -240,7 +233,6 @@ export function Wheel({
         start = end;
       });
 
-      // Outer ring
       ctx.beginPath();
       ctx.arc(cx, cy, r, 0, Math.PI * 2);
       ctx.strokeStyle = '#334155';
@@ -253,7 +245,6 @@ export function Wheel({
       ctx.lineWidth = 1;
       ctx.stroke();
 
-      // Center hub
       const hubR2 = r * 0.09;
       const grad = ctx.createRadialGradient(
         cx - hubR2 * 0.3,
@@ -310,8 +301,12 @@ export function Wheel({
 
     let acc = 0;
     for (let i = 0; i < targetIdx; i++) acc += angles[i];
-    const sectorCenter = acc + angles[targetIdx] / 2;
-    const desiredNorm = norm(-Math.PI / 2 - sectorCenter);
+    const halfSector = angles[targetIdx] / 2;
+    // Random offset within ±80% of half-sector = pointer lands at 10%-90% of sector width
+    const randomOffset = (Math.random() - 0.5) * halfSector * 1.6;
+    landingOffsetRef.current = randomOffset;
+    const landingAngle = acc + halfSector + randomOffset;
+    const desiredNorm = norm(-Math.PI / 2 - landingAngle);
 
     const numRotations = 6 + Math.floor(Math.random() * 5);
     const fullRotations = 2 * Math.PI * numRotations;
@@ -339,7 +334,6 @@ export function Wheel({
       onAngleChange(angle);
       draw(angle);
 
-      // Tick sound: slower = more spaced out
       const speed = 1 - t;
       const tickGap = 190 - speed * 160;
       if (elapsed - lastTick > tickGap) {
@@ -361,8 +355,8 @@ export function Wheel({
         if (visualIndex !== logicalIndex) {
           let correctAcc = 0;
           for (let i = 0; i < logicalIndex; i++) correctAcc += angles[i];
-          const correctSectorCenter = correctAcc + angles[logicalIndex] / 2;
-          const correctedNorm = norm(-Math.PI / 2 - correctSectorCenter);
+          const correctLanding = correctAcc + angles[logicalIndex] / 2 + landingOffsetRef.current;
+          const correctedNorm = norm(-Math.PI / 2 - correctLanding);
           const correctedAngle = startAngle + fullRotations + norm(correctedNorm - startNorm);
           angleRef.current = correctedAngle;
           draw(correctedAngle);
