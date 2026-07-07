@@ -7,6 +7,7 @@ interface WheelProps {
   options: SpinOption[];
   spinTargetId: string | null;
   showWeights: boolean;
+  showPercentages: boolean;
   onSpinStart: () => void;
   onSpinEnd: (optionId: string) => void;
   onAngleChange: (angle: number) => void;
@@ -82,17 +83,11 @@ function getIndexFromAngle(
   return 0;
 }
 
-/** Measure the width of a single character to estimate fit */
-function charWidth(fontSize: number): number {
-  // CJK char at given font size is roughly fontSize px wide
-  // Latin char is roughly fontSize * 0.55 px wide
-  return fontSize;
-}
-
 export function Wheel({
   options,
   spinTargetId,
   showWeights,
+  showPercentages,
   onSpinStart,
   onSpinEnd,
   onAngleChange,
@@ -153,6 +148,7 @@ export function Wheel({
       ctx.restore();
 
       const angles = computeAngles(drawOptions);
+      const totalWeight = drawOptions.reduce((s, o) => s + o.weight, 0);
       let start = angle;
 
       angles.forEach((a, i) => {
@@ -198,7 +194,7 @@ export function Wheel({
           const maxTextW = arcW * 0.9;
           lines = wrapText(ctx, opt.name, maxTextW, fontSize);
           lineH = fontSize * 1.25;
-          const weightLines = showWeights ? 1 : 0;
+          const weightLines = (showWeights ? 1 : 0) + (showPercentages ? 1 : 0);
           const totalH = (lines.length + weightLines) * lineH;
 
           if (totalH <= maxRadialH || fontSize <= 7) break;
@@ -213,7 +209,7 @@ export function Wheel({
         const maxTextW = arcW * 0.9;
         lines = wrapText(ctx, opt.name, maxTextW, fontSize);
 
-        const weightLines = showWeights ? 1 : 0;
+        const weightLines = (showWeights ? 1 : 0) + (showPercentages ? 1 : 0);
         const totalLines = lines.length + weightLines;
         const totalH = (totalLines - 1) * lineH;
 
@@ -228,6 +224,16 @@ export function Wheel({
           ctx.font = `${wSz}px "PingFang SC","Microsoft YaHei",sans-serif`;
           const wy = -totalH / 2 + lines.length * lineH + lineH / 2;
           ctx.fillText(`${opt.weight}`, 0, wy);
+        }
+
+        if (showPercentages) {
+          const pct = totalWeight > 0 ? (opt.weight / totalWeight * 100) : 0;
+          const pctText = pct >= 10 ? pct.toFixed(1) + '%' : pct.toFixed(2) + '%';
+          const pSz = Math.max(7, fontSize * 0.7);
+          ctx.font = `${pSz}px "PingFang SC","Microsoft YaHei",sans-serif`;
+          const prevLines = lines.length + (showWeights ? 1 : 0);
+          const py = -totalH / 2 + prevLines * lineH + lineH / 2;
+          ctx.fillText(pctText, 0, py);
         }
 
         ctx.restore();
@@ -267,14 +273,14 @@ export function Wheel({
       ctx.lineWidth = 1.5;
       ctx.stroke();
     },
-    [options, showWeights]
+    [options, showWeights, showPercentages]
   );
 
   useEffect(() => {
     if (!spinningRef.current) {
       draw(angleRef.current);
     }
-  }, [options, showWeights, draw]);
+  }, [options, showWeights, showPercentages, draw]);
 
   useEffect(() => {
     const onResize = () => {

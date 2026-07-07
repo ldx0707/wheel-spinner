@@ -6,6 +6,7 @@ interface SettingsPanelProps {
   onNoRepeatChange: (v: boolean) => void;
   onBoostFactorChange: (v: number) => void;
   onShowWeightsChange: (v: boolean) => void;
+  onShowPercentagesChange: (v: boolean) => void;
 }
 
 export function SettingsPanel({
@@ -13,6 +14,7 @@ export function SettingsPanel({
   onNoRepeatChange,
   onBoostFactorChange,
   onShowWeightsChange,
+  onShowPercentagesChange,
 }: SettingsPanelProps) {
 
   return (
@@ -43,6 +45,19 @@ export function SettingsPanel({
           <button
             className={`toggle-switch${settings.showWeights ? ' active' : ''}`}
             onClick={() => onShowWeightsChange(!settings.showWeights)}
+          >
+            <span className="toggle-knob" />
+          </button>
+        </div>
+
+        <div className="setting-row">
+          <div className="setting-label">
+            <span className="setting-name">{t('settingsShowPercentages')}</span>
+            <span className="setting-desc">{t('settingsShowPercentagesDesc')}</span>
+          </div>
+          <button
+            className={`toggle-switch${settings.showPercentages ? ' active' : ''}`}
+            onClick={() => onShowPercentagesChange(!settings.showPercentages)}
           >
             <span className="toggle-knob" />
           </button>

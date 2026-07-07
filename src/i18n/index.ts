@@ -23,6 +23,7 @@ const translations: Record<string, Record<string, string>> = {
   optWeight: { zh: '权重', en: 'Weight' },
   optWeightRange: { zh: '权重 (1-10000)', en: 'Weight (1-10000)' },
   optColor: { zh: '颜色', en: 'Color' },
+  optPercent: { zh: '占比', en: 'Ratio' },
   optSave: { zh: '保存', en: 'Save' },
   optCancel: { zh: '取消', en: 'Cancel' },
   optEdit: { zh: '编辑', en: 'Edit' },
@@ -45,11 +46,14 @@ const translations: Record<string, Record<string, string>> = {
   settingsBoostOff: { zh: '关闭', en: 'Off' },
   settingsShowWeights: { zh: '显示转盘权重', en: 'Show weights on wheel' },
   settingsShowWeightsDesc: { zh: '在转盘扇形内显示选项权重数值', en: 'Display weight value inside each sector' },
+  settingsShowPercentages: { zh: '显示转盘占比', en: 'Show percentages on wheel' },
+  settingsShowPercentagesDesc: { zh: '在转盘扇形内显示选中概率百分比', en: 'Display selection probability inside each sector' },
 
   histTitle: { zh: '历史记录', en: 'History' },
   histClear: { zh: '清空', en: 'Clear' },
   histEmpty: { zh: '暂无记录，转动转盘开始记录', en: 'No history yet. Spin to record.' },
   histWeight: { zh: '权重', en: 'Weight' },
+  histPercent: { zh: '占比', en: 'Ratio' },
   histPrev: { zh: '上一页', en: 'Prev' },
   histNext: { zh: '下一页', en: 'Next' },
 

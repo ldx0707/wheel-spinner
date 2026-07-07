@@ -12,9 +12,15 @@ interface OptionPanelProps {
 
 type EditTarget = { id: string; field: 'name' | 'weight' | 'color' } | null;
 
+function fmtPercent(weight: number, total: number): string {
+  if (total === 0) return '0.00%';
+  return (Math.floor((weight / total) * 10000) / 100).toFixed(2) + '%';
+}
+
 export function OptionPanel({ options, onAdd, onUpdate, onRemove }: OptionPanelProps) {
   const [showAddSheet, setShowAddSheet] = useState(false);
   const [editing, setEditing] = useState<EditTarget>(null);
+  const totalWeight = options.reduce((s, o) => s + o.weight, 0);
 
   return (
     <div className="panel">
@@ -34,6 +40,7 @@ export function OptionPanel({ options, onAdd, onUpdate, onRemove }: OptionPanelP
           <OptionRow
             key={opt.id}
             option={opt}
+            totalWeight={totalWeight}
             editing={editing}
             onStartEdit={setEditing}
             onEndEdit={() => setEditing(null)}
@@ -61,6 +68,7 @@ export function OptionPanel({ options, onAdd, onUpdate, onRemove }: OptionPanelP
 
 interface OptionRowProps {
   option: SpinOption;
+  totalWeight: number;
   editing: EditTarget;
   onStartEdit: (et: EditTarget) => void;
   onEndEdit: () => void;
@@ -68,7 +76,7 @@ interface OptionRowProps {
   onRemove: (id: string) => void;
 }
 
-function OptionRow({ option, editing, onStartEdit, onEndEdit, onUpdate, onRemove }: OptionRowProps) {
+function OptionRow({ option, totalWeight, editing, onStartEdit, onEndEdit, onUpdate, onRemove }: OptionRowProps) {
   const isEditingThis = editing?.id === option.id;
   const editField = isEditingThis ? editing!.field : null;
   const dotRef = useRef<HTMLSpanElement>(null);
@@ -135,6 +143,10 @@ function OptionRow({ option, editing, onStartEdit, onEndEdit, onUpdate, onRemove
           {t('optWeight')} {option.weight}
         </span>
       )}
+
+      <span className="option-percent">
+        {fmtPercent(option.weight, totalWeight)}
+      </span>
 
       {editField === 'color' && (
         <div

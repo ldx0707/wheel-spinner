@@ -20,6 +20,10 @@ function formatTime(ts: number): string {
   return `${d.getMonth() + 1}/${d.getDate()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
+function fmtPercent(v: number): string {
+  return Math.floor(v * 10000) / 100 + '%';
+}
+
 export function HistoryPanel({ paged, page, totalPages, onPage, onClear }: HistoryPanelProps) {
 
   return (
@@ -37,7 +41,7 @@ export function HistoryPanel({ paged, page, totalPages, onPage, onClear }: Histo
               <div className="history-row" key={h.id}>
                 <span className="color-dot" style={{ backgroundColor: h.optionColor }} />
                 <span className="history-name">{h.optionName}</span>
-                <span className="history-weight">{t('histWeight')}: {h.weight}</span>
+                <span className="history-weight">{t('histWeight')}: {h.weight} ({fmtPercent(h.percentage)})</span>
                 <span className="history-time">{formatTime(h.timestamp)}</span>
               </div>
             ))}

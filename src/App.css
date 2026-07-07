@@ -399,8 +399,16 @@ input {
   text-align: right;
   cursor: pointer;
   flex-shrink: 0;
-
   margin-left: auto;
+}
+
+.option-percent {
+  font-size: 12px;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+  flex-shrink: 0;
+  min-width: 42px;
+  text-align: left;
 }
 
 /* ===== Inline Editing ===== */
@@ -428,7 +436,6 @@ input {
   text-align: center;
   font-size: 12px;
   color: var(--color-text);
-
   margin-left: auto;
 }
 

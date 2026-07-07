@@ -16,6 +16,7 @@ const DEFAULT_SETTINGS: WheelSettings = {
   noRepeat: false,
   boostFactor: 0.08,
   showWeights: false,
+  showPercentages: false,
 };
 
 let idCounter = Date.now();
@@ -47,6 +48,7 @@ function migrateFromOldKeys(): WheelData[] | null {
       noRepeat: oldSettings.noRepeat ?? false,
       boostFactor: oldSettings.boostFactor ?? 0.08,
       showWeights: false,
+      showPercentages: false,
     };
     const wheel: WheelData = {
       id: nextId(),
@@ -55,7 +57,6 @@ function migrateFromOldKeys(): WheelData[] | null {
       history,
       settings,
     };
-    // Clear old keys after migration
     localStorage.removeItem('wheel_options');
     localStorage.removeItem('wheel_history');
     localStorage.removeItem('wheel_settings');

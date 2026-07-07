@@ -10,6 +10,7 @@ export interface SpinHistoryEntry {
   optionName: string;
   optionColor: string;
   weight: number;
+  percentage: number;
   timestamp: number;
 }
 
@@ -23,6 +24,7 @@ export interface WheelSettings {
   noRepeat: boolean;
   boostFactor: number;
   showWeights: boolean;
+  showPercentages: boolean;
 }
 
 export interface WheelData {

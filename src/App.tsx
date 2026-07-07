@@ -143,10 +143,12 @@ export default function App() {
       const opt = currentOptions.find((o) => o.id === optionId);
       if (opt) {
         setSelected(opt);
+        const totalWeight = currentOptions.reduce((s, o) => s + o.weight, 0);
         addHistoryEntry({
           optionName: opt.name,
           optionColor: opt.color,
           weight: opt.weight,
+          percentage: totalWeight > 0 ? opt.weight / totalWeight : 0,
           timestamp: Date.now(),
         });
         playWin();
@@ -215,6 +217,7 @@ export default function App() {
               options={activeWheel.options}
               spinTargetId={spinTargetId}
               showWeights={activeWheel.settings.showWeights}
+              showPercentages={activeWheel.settings.showPercentages}
               onSpinStart={() => {}}
               onSpinEnd={handleSpinEnd}
               onAngleChange={() => {}}
@@ -267,6 +270,7 @@ export default function App() {
             onNoRepeatChange={(v) => updateSettings({ noRepeat: v })}
             onBoostFactorChange={(v) => updateSettings({ boostFactor: v })}
             onShowWeightsChange={(v) => updateSettings({ showWeights: v })}
+            onShowPercentagesChange={(v) => updateSettings({ showPercentages: v })}
           />
         )}
       </main>
