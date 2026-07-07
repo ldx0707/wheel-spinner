@@ -19,7 +19,16 @@ export interface WeightedOption {
   boost: number;
 }
 
-export interface AppSettings {
+export interface WheelSettings {
   noRepeat: boolean;
   boostFactor: number;
+  showWeights: boolean;
+}
+
+export interface WheelData {
+  id: string;
+  name: string;
+  options: SpinOption[];
+  history: SpinHistoryEntry[];
+  settings: WheelSettings;
 }

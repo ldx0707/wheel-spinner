@@ -1,59 +1,129 @@
-import { useState, useRef, useCallback } from 'react';
-import { Wheel } from './components/Wheel';
-import { OptionPanel } from './components/OptionPanel';
-import { HistoryPanel } from './components/HistoryPanel';
-import { SettingsPanel } from './components/SettingsPanel';
-import { useOptions } from './hooks/useOptions';
-import { useHistory } from './hooks/useHistory';
-import { useSettings } from './hooks/useSettings';
-import { useI18n } from './hooks/useI18n';
-import { selectWeighted } from './utils/random';
-import { playWin, isMuted, toggleMute } from './utils/sound';
-import type { SpinOption, WeightedOption } from './types';
-import './App.css';
+import { useState, useRef, useCallback } from "react";
+import { Wheel } from "./components/Wheel";
+import { OptionPanel } from "./components/OptionPanel";
+import { HistoryPanel } from "./components/HistoryPanel";
+import { SettingsPanel } from "./components/SettingsPanel";
+import { WheelDrawer } from "./components/WheelDrawer";
+import { useWheels } from "./hooks/useWheels";
+import { getLang, toggleLang, t } from "./i18n";
+import { selectWeighted } from "./utils/random";
+import { playWin, isMuted, toggleMute } from "./utils/sound";
+import type { SpinOption, WeightedOption, SpinHistoryEntry } from "./types";
+import "./App.css";
 
-type Tab = 'wheel' | 'options' | 'history' | 'settings';
+type Tab = "wheel" | "options" | "history" | "settings";
+
+const PAGE_SIZE = 10;
+
+let histIdCounter = Date.now();
+function nextHistId(): string {
+  return (++histIdCounter).toString(36) + Math.random().toString(36).slice(2, 6);
+}
 
 export default function App() {
-  const { t, lang, toggle: toggleLang } = useI18n();
-  const { options, add, update, remove } = useOptions();
-  const { paged, page, totalPages, setPage, add: addHistory, clear: clearHistory } = useHistory();
+  const [, setI18nTick] = useState(0);
+  const lang = getLang();
+  const handleToggleLang = () => { toggleLang(); setI18nTick(n => n + 1); };
+  const { wheels, activeId, activeWheel, updateWheel, addWheel, removeWheel, switchWheel } = useWheels();
 
-  const { settings, setNoRepeat, setBoostFactor } = useSettings();
-  const [tab, setTab] = useState<Tab>('wheel');
+  const [tab, setTab] = useState<Tab>("wheel");
   const [spinning, setSpinning] = useState(false);
   const [spinTargetId, setSpinTargetId] = useState<string | null>(null);
   const [selected, setSelected] = useState<SpinOption | null>(null);
   const [muted, setMuted] = useState(isMuted);
+  const [drawerOpen, setDrawerOpen] = useState(false);
 
-  const boostRef = useRef<Map<string, number>>(new Map());
-  const optionsRef = useRef(options);
-  optionsRef.current = options;
+  const [historyPage, setHistoryPage] = useState(0);
 
+  const boostMapRef = useRef<Map<string, Map<string, number>>>(new Map());
+  const optionsRef = useRef(activeWheel.options);
+  optionsRef.current = activeWheel.options;
   const lastSelectedRef = useRef<string | null>(null);
-  const canSpin = options.length >= 2 && !spinning;
 
-  const handleSpinStart = useCallback(() => {}, []);
-  const handleAngleChange = useCallback((_angle: number) => {}, []);
+  const canSpin = activeWheel.options.length >= 2 && !spinning;
+
+  const updateSettings = useCallback(
+    (patch: Partial<typeof activeWheel.settings>) => {
+      updateWheel(activeWheel.id, {
+        settings: { ...activeWheel.settings, ...patch },
+      });
+      setHistoryPage(0);
+    },
+    [activeWheel, updateWheel]
+  );
+
+  const addOption = useCallback(
+    (opt: Omit<SpinOption, "id">) => {
+      const newOpt: SpinOption = { ...opt, id: nextHistId() };
+      updateWheel(activeWheel.id, {
+        options: [...activeWheel.options, newOpt],
+      });
+    },
+    [activeWheel, updateWheel]
+  );
+
+  const updateOption = useCallback(
+    (id: string, patch: Partial<Omit<SpinOption, "id">>) => {
+      updateWheel(activeWheel.id, {
+        options: activeWheel.options.map((o) => (o.id === id ? { ...o, ...patch } : o)),
+      });
+    },
+    [activeWheel, updateWheel]
+  );
+
+  const removeOption = useCallback(
+    (id: string) => {
+      updateWheel(activeWheel.id, {
+        options: activeWheel.options.filter((o) => o.id !== id),
+      });
+    },
+    [activeWheel, updateWheel]
+  );
+
+  const addHistoryEntry = useCallback(
+    (entry: Omit<SpinHistoryEntry, "id">) => {
+      const item: SpinHistoryEntry = { ...entry, id: nextHistId() };
+      const hist = [item, ...activeWheel.history].slice(0, 500);
+      updateWheel(activeWheel.id, { history: hist });
+    },
+    [activeWheel, updateWheel]
+  );
+
+  const clearHistory = useCallback(() => {
+    updateWheel(activeWheel.id, { history: [] });
+    setHistoryPage(0);
+  }, [activeWheel, updateWheel]);
+
+  const handleRenameWheel = useCallback(
+    (id: string, name: string) => {
+      updateWheel(id, { name });
+    },
+    [updateWheel]
+  );
 
   const handleSpin = useCallback(() => {
     if (!canSpin) return;
     setSpinning(true);
 
     const currentOptions = optionsRef.current;
+    const wheelBoost = boostMapRef.current.get(activeWheel.id) ?? new Map();
+
     const weighted: WeightedOption[] = currentOptions.map((o) => ({
       id: o.id,
       weight: o.weight,
-      boost: boostRef.current.get(o.id) || 0,
+      boost: wheelBoost.get(o.id) || 0,
     }));
 
     const { selectedId, updatedOptions } = selectWeighted(weighted, {
-      boostFactor: settings.boostFactor,
-      noRepeat: settings.noRepeat,
+      boostFactor: activeWheel.settings.boostFactor,
+      noRepeat: activeWheel.settings.noRepeat,
       lastSelectedId: lastSelectedRef.current,
     });
     lastSelectedRef.current = selectedId;
-    updatedOptions.forEach((o) => boostRef.current.set(o.id, o.boost));
+
+    const newBoost = new Map(wheelBoost);
+    updatedOptions.forEach((o) => newBoost.set(o.id, o.boost));
+    boostMapRef.current.set(activeWheel.id, newBoost);
 
     if (!currentOptions.find((o) => o.id === selectedId)) {
       setSpinning(false);
@@ -62,7 +132,7 @@ export default function App() {
 
     setSelected(null);
     setSpinTargetId(selectedId);
-  }, [canSpin, settings]);
+  }, [canSpin, activeWheel]);
 
   const handleSpinEnd = useCallback(
     (optionId: string) => {
@@ -73,7 +143,7 @@ export default function App() {
       const opt = currentOptions.find((o) => o.id === optionId);
       if (opt) {
         setSelected(opt);
-        addHistory({
+        addHistoryEntry({
           optionName: opt.name,
           optionColor: opt.color,
           weight: opt.weight,
@@ -82,7 +152,7 @@ export default function App() {
         playWin();
       }
     },
-    [addHistory]
+    [addHistoryEntry]
   );
 
   const handleMute = () => {
@@ -90,123 +160,147 @@ export default function App() {
     setMuted(now);
   };
 
+  const totalPages = Math.max(1, Math.ceil(activeWheel.history.length / PAGE_SIZE));
+  const paged = activeWheel.history.slice(
+    historyPage * PAGE_SIZE,
+    (historyPage + 1) * PAGE_SIZE
+  );
+
+  const handleSwitchWheel = useCallback(
+    (id: string) => {
+      switchWheel(id);
+      setHistoryPage(0);
+      lastSelectedRef.current = null;
+      setSelected(null);
+    },
+    [switchWheel]
+  );
+
   return (
     <div className="app">
       <header className="app-header">
-        <h1>{t('appTitle')}</h1>
-        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+        <button
+          className="btn-icon hamburger-btn"
+          onClick={() => setDrawerOpen(true)}
+          aria-label="Menu"
+        >
+          <span className="hamburger-line" />
+          <span className="hamburger-line" />
+          <span className="hamburger-line" />
+        </button>
+        <h1>{activeWheel?.name ?? "Wheel Spinner"}</h1>
+        <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
           <button
-            className={`btn-icon mute-btn${muted ? ' muted' : ''}`}
+            className={`btn-icon mute-btn${muted ? " muted" : ""}`}
             onClick={handleMute}
-            aria-label={muted ? t('muteOn') : t('muteOff')}
+            aria-label={muted ? t("muteOn") : t("muteOff")}
           >
             {muted ? <SpeakerOffIcon /> : <SpeakerOnIcon />}
           </button>
           <button
             className="btn-icon mute-btn"
-            onClick={toggleLang}
+            onClick={handleToggleLang}
             aria-label="Language"
             style={{ fontSize: 12, fontWeight: 700, width: 32 }}
           >
-            {lang === 'zh' ? 'EN' : '中'}
+            {lang === "zh" ? "EN" : "\u4e2d"}
           </button>
         </div>
       </header>
 
       <main className="app-main">
-        {tab === 'wheel' && (
+        {tab === "wheel" && (
           <div className="wheel-page">
             <Wheel
-              options={options}
+              options={activeWheel.options}
               spinTargetId={spinTargetId}
-              onSpinStart={handleSpinStart}
+              showWeights={activeWheel.settings.showWeights}
+              onSpinStart={() => {}}
               onSpinEnd={handleSpinEnd}
-              onAngleChange={handleAngleChange}
+              onAngleChange={() => {}}
             />
 
-            <div className={`result-area${selected ? ' visible' : ''}`}>
+            <div className={`result-area${selected ? " visible" : ""}`}>
               {selected && (
                 <>
-                  <span
-                    className="result-dot"
-                    style={{ backgroundColor: selected.color }}
-                  />
+                  <span className="result-dot" style={{ backgroundColor: selected.color }} />
                   <span className="result-text">
-                    {t('resultSelected')}<strong>{selected.name}</strong>
-                    <span className="result-weight">{t('resultWeight')} {selected.weight}</span>
+                    {t("resultSelected")}<strong>{selected.name}</strong>
+                    <span className="result-weight">{t("resultWeight")} {selected.weight}</span>
                   </span>
                 </>
               )}
             </div>
 
             <button
-              className={`spin-btn${spinning ? ' spinning' : ''}`}
+              className={`spin-btn${spinning ? " spinning" : ""}`}
               disabled={!canSpin}
               onClick={handleSpin}
             >
-              {spinning ? t('spinBtnSpinning') : options.length < 2 ? t('spinBtnNeedMore') : t('spinBtnGo')}
+              {spinning ? t("spinBtnSpinning") : activeWheel.options.length < 2 ? t("spinBtnNeedMore") : t("spinBtnGo")}
             </button>
           </div>
         )}
 
-        {tab === 'options' && (
+        {tab === "options" && (
           <OptionPanel
-            options={options}
-            onAdd={add}
-            onUpdate={update}
-            onRemove={remove}
+            options={activeWheel.options}
+            onAdd={addOption}
+            onUpdate={updateOption}
+            onRemove={removeOption}
           />
         )}
 
-        {tab === 'history' && (
+        {tab === "history" && (
           <HistoryPanel
             paged={paged}
-            page={page}
+            page={historyPage}
             totalPages={totalPages}
-            onPage={setPage}
+            onPage={setHistoryPage}
             onClear={clearHistory}
           />
         )}
 
-        {tab === 'settings' && (
+        {tab === "settings" && (
           <SettingsPanel
-            settings={settings}
-            onNoRepeatChange={setNoRepeat}
-            onBoostFactorChange={setBoostFactor}
+            settings={activeWheel.settings}
+            onNoRepeatChange={(v) => updateSettings({ noRepeat: v })}
+            onBoostFactorChange={(v) => updateSettings({ boostFactor: v })}
+            onShowWeightsChange={(v) => updateSettings({ showWeights: v })}
           />
         )}
       </main>
 
       <nav className="tab-bar">
-        <button
-          className={`tab-btn${tab === 'wheel' ? ' active' : ''}`}
-          onClick={() => setTab('wheel')}
-        >
+        <button className={`tab-btn${tab === "wheel" ? " active" : ""}`} onClick={() => setTab("wheel")}>
           <WheelIcon />
-          <span>{t('tabWheel')}</span>
+          <span>{t("tabWheel")}</span>
         </button>
-        <button
-          className={`tab-btn${tab === 'options' ? ' active' : ''}`}
-          onClick={() => setTab('options')}
-        >
+        <button className={`tab-btn${tab === "options" ? " active" : ""}`} onClick={() => setTab("options")}>
           <ListIcon />
-          <span>{t('tabOptions')}</span>
+          <span>{t("tabOptions")}</span>
         </button>
-        <button
-          className={`tab-btn${tab === 'history' ? ' active' : ''}`}
-          onClick={() => setTab('history')}
-        >
+        <button className={`tab-btn${tab === "history" ? " active" : ""}`} onClick={() => setTab("history")}>
           <ClockIcon />
-          <span>{t('tabHistory')}</span>
+          <span>{t("tabHistory")}</span>
         </button>
-        <button
-          className={`tab-btn${tab === 'settings' ? ' active' : ''}`}
-          onClick={() => setTab('settings')}
-        >
+        <button className={`tab-btn${tab === "settings" ? " active" : ""}`} onClick={() => setTab("settings")}>
           <GearIcon />
-          <span>{t('tabSettings')}</span>
+          <span>{t("tabSettings")}</span>
         </button>
       </nav>
+
+      {drawerOpen && (
+        <WheelDrawer
+          wheels={wheels}
+          activeId={activeId}
+          onSwitch={handleSwitchWheel}
+          onAdd={addWheel}
+          onRemove={removeWheel}
+          onRename={handleRenameWheel}
+          onClose={() => setDrawerOpen(false)}
+        />
+      )}
     </div>
   );
 }
@@ -274,9 +368,3 @@ function ClockIcon() {
     </svg>
   );
 }
-
-
-
-
-
-

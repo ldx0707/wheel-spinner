@@ -6,6 +6,7 @@ import { playTick } from '../utils/sound';
 interface WheelProps {
   options: SpinOption[];
   spinTargetId: string | null;
+  showWeights: boolean;
   onSpinStart: () => void;
   onSpinEnd: (optionId: string) => void;
   onAngleChange: (angle: number) => void;
@@ -33,36 +34,44 @@ function contrastColor(hex: string): string {
   return (0.299 * r + 0.587 * g + 0.114 * b) / 255 > 0.55 ? '#1e293b' : '#ffffff';
 }
 
-function truncate(
+/** Wrap text into lines that fit within maxWidth at given fontSize */
+function wrapText(
   ctx: CanvasRenderingContext2D,
   text: string,
-  maxW: number
-): string {
-  if (ctx.measureText(text).width <= maxW) return text;
-  let t = text;
-  while (t.length > 1 && ctx.measureText(t + '...').width > maxW) t = t.slice(0, -1);
-  return t + '...';
+  maxWidth: number,
+  fontSize: number,
+): string[] {
+  ctx.font = `bold ${fontSize}px "PingFang SC","Microsoft YaHei",sans-serif`;
+  const chars = [...text];
+  const lines: string[] = [];
+  let cur = '';
+  for (const ch of chars) {
+    const test = cur + ch;
+    if (ctx.measureText(test).width > maxWidth && cur.length > 0) {
+      lines.push(cur);
+      cur = ch;
+    } else {
+      cur = test;
+    }
+  }
+  if (cur) lines.push(cur);
+  if (lines.length === 0) lines.push(text);
+  return lines;
 }
 
 function norm(a: number): number {
   return ((a % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
 }
 
-/** LOCK POINT 4 helper: which sector is under the pointer (top, -PI/2) at a given angle? */
 function getIndexFromAngle(
   angle: number,
   angles: number[],
-  options: SpinOption[]
 ): number {
-  // Pointer is at -PI/2 (12 o'clock). The sector at this position:
-  // Sector i spans [angle + sum(angles[0..i-1]), angle + sum(angles[0..i]))
-  // Check which sector contains -PI/2
   const pointer = norm(-Math.PI / 2);
   let acc = norm(angle);
   for (let i = 0; i < angles.length; i++) {
     const start = acc;
     const end = norm(acc + angles[i]);
-    // Handle wrap-around
     if (start <= end) {
       if (pointer >= start && pointer < end) return i;
     } else {
@@ -73,9 +82,17 @@ function getIndexFromAngle(
   return 0;
 }
 
+/** Measure the width of a single character to estimate fit */
+function charWidth(fontSize: number): number {
+  // CJK char at given font size is roughly fontSize px wide
+  // Latin char is roughly fontSize * 0.55 px wide
+  return fontSize;
+}
+
 export function Wheel({
   options,
   spinTargetId,
+  showWeights,
   onSpinStart,
   onSpinEnd,
   onAngleChange,
@@ -86,7 +103,6 @@ export function Wheel({
   const animIdRef = useRef(0);
   const frozenRef = useRef<SpinOption[] | null>(null);
 
-  // LOCK POINT 1: pre-computed target index, set before rAF, never mutated during animation
   const resultIndexRef = useRef<number>(-1);
   const resultIdRef = useRef<string | null>(null);
 
@@ -106,7 +122,7 @@ export function Wheel({
 
       const cx = size / 2;
       const cy = size / 2;
-      const r = size / 2 - 6;
+      const r = size / 2 - 8;
 
       const drawOptions = frozenRef.current || options;
 
@@ -125,6 +141,7 @@ export function Wheel({
         return;
       }
 
+      // Wheel shadow
       ctx.save();
       ctx.shadowColor = 'rgba(0,0,0,0.25)';
       ctx.shadowBlur = 14;
@@ -148,34 +165,76 @@ export function Wheel({
         ctx.closePath();
         ctx.fillStyle = opt.color;
         ctx.fill();
-        ctx.strokeStyle = 'rgba(255,255,255,0.55)';
-        ctx.lineWidth = 1.5;
+        ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+        ctx.lineWidth = 1.2;
         ctx.stroke();
 
         const mid = start + a / 2;
-        const textR = r * 0.62;
-        const tx = cx + Math.cos(mid) * textR;
-        const ty = cy + Math.sin(mid) * textR;
+        const textR = r * 0.58;
 
         ctx.save();
-        ctx.translate(tx, ty);
+        ctx.translate(cx + Math.cos(mid) * textR, cy + Math.sin(mid) * textR);
         ctx.rotate(mid + Math.PI / 2);
-
-        const fontSize = Math.max(10, Math.min(a * r * 0.28, 16));
-        ctx.font = `bold ${fontSize}px "PingFang SC","Microsoft YaHei",sans-serif`;
         ctx.fillStyle = contrastColor(opt.color);
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
 
-        const nameMax = textR * 0.55;
-        ctx.fillText(truncate(ctx, opt.name, nameMax), 0, -fontSize * 0.45);
-        ctx.font = `${fontSize * 0.72}px "PingFang SC","Microsoft YaHei",sans-serif`;
-        ctx.fillText(`${t('wheelWeight')}:${opt.weight}`, 0, fontSize * 0.65);
-        ctx.restore();
+        // Arc width at text radius = available width for text (tangential)
+        const arcW = a * textR;
+        // Radial space from textR inward toward center (minus hub area)
+        const hubR = r * 0.11;
+        const radialSpace = r - textR - hubR;
+        const maxRadialH = radialSpace * 0.85;
 
+        // Conservative initial font size based on both sector size and radial space
+        const baseSz = Math.min(a * r * 0.3, radialSpace * 0.55, 15);
+
+        let fontSize = Math.max(7, baseSz);
+        let lines: string[] = [opt.name];
+        let lineH = fontSize * 1.3;
+
+        // Iteratively reduce font size until text fits
+        for (let attempt = 0; attempt < 6; attempt++) {
+          const maxTextW = arcW * 0.9;
+          lines = wrapText(ctx, opt.name, maxTextW, fontSize);
+          lineH = fontSize * 1.25;
+          const weightLines = showWeights ? 1 : 0;
+          const totalH = (lines.length + weightLines) * lineH;
+
+          if (totalH <= maxRadialH || fontSize <= 7) break;
+          fontSize = Math.max(7, fontSize * 0.78);
+        }
+
+        // Final clamp
+        fontSize = Math.max(7, Math.min(fontSize, 14));
+        lineH = fontSize * 1.25;
+
+        // Recompute lines with final font size
+        const maxTextW = arcW * 0.9;
+        lines = wrapText(ctx, opt.name, maxTextW, fontSize);
+
+        const weightLines = showWeights ? 1 : 0;
+        const totalLines = lines.length + weightLines;
+        const totalH = (totalLines - 1) * lineH;
+
+        ctx.font = `bold ${fontSize}px "PingFang SC","Microsoft YaHei",sans-serif`;
+        for (let li = 0; li < lines.length; li++) {
+          const y = -totalH / 2 + li * lineH + lineH / 2;
+          ctx.fillText(lines[li], 0, y);
+        }
+
+        if (showWeights) {
+          const wSz = Math.max(7, fontSize * 0.7);
+          ctx.font = `${wSz}px "PingFang SC","Microsoft YaHei",sans-serif`;
+          const wy = -totalH / 2 + lines.length * lineH + lineH / 2;
+          ctx.fillText(`${opt.weight}`, 0, wy);
+        }
+
+        ctx.restore();
         start = end;
       });
 
+      // Outer ring
       ctx.beginPath();
       ctx.arc(cx, cy, r, 0, Math.PI * 2);
       ctx.strokeStyle = '#334155';
@@ -184,37 +243,38 @@ export function Wheel({
 
       ctx.beginPath();
       ctx.arc(cx, cy, r - 3, 0, Math.PI * 2);
-      ctx.strokeStyle = 'rgba(255,255,255,0.35)';
+      ctx.strokeStyle = 'rgba(255,255,255,0.3)';
       ctx.lineWidth = 1;
       ctx.stroke();
 
-      const hubR = r * 0.1;
+      // Center hub
+      const hubR2 = r * 0.09;
       const grad = ctx.createRadialGradient(
-        cx - hubR * 0.3,
-        cy - hubR * 0.3,
-        hubR * 0.1,
+        cx - hubR2 * 0.3,
+        cy - hubR2 * 0.3,
+        hubR2 * 0.1,
         cx,
         cy,
-        hubR
+        hubR2
       );
       grad.addColorStop(0, '#ffffff');
       grad.addColorStop(1, '#cbd5e1');
       ctx.beginPath();
-      ctx.arc(cx, cy, hubR, 0, Math.PI * 2);
+      ctx.arc(cx, cy, hubR2, 0, Math.PI * 2);
       ctx.fillStyle = grad;
       ctx.fill();
       ctx.strokeStyle = '#475569';
       ctx.lineWidth = 1.5;
       ctx.stroke();
     },
-    [options]
+    [options, showWeights]
   );
 
   useEffect(() => {
     if (!spinningRef.current) {
       draw(angleRef.current);
     }
-  }, [options, draw]);
+  }, [options, showWeights, draw]);
 
   useEffect(() => {
     const onResize = () => {
@@ -228,7 +288,6 @@ export function Wheel({
   useEffect(() => {
     if (spinTargetId === null || options.length === 0) return;
 
-    // ---- LOCK POINT 1: freeze everything BEFORE rAF ----
     const snapshot = options.map((o) => ({ ...o }));
     frozenRef.current = snapshot;
 
@@ -238,33 +297,17 @@ export function Wheel({
       return;
     }
 
-    // Store pre-computed result in refs (never modified during animation)
     resultIndexRef.current = targetIdx;
     resultIdRef.current = spinTargetId;
 
     const angles = computeAngles(snapshot);
 
-    console.log(
-      '[LOCK1] Pre-computed | targetIdx:', targetIdx,
-      '| option:', snapshot[targetIdx].name,
-      '| options:', snapshot.map(o => o.name).join(', ')
-    );
-
-    // ---- LOCK POINT 2: angle math ----
-    // Pointer is at -PI/2 (12 o'clock). Sector i spans [angle+sum(angles[0..i-1]), angle+sum(angles[0..i]))
-    // We want sector targetIdx center = pointer at -PI/2
     let acc = 0;
     for (let i = 0; i < targetIdx; i++) acc += angles[i];
     const sectorCenter = acc + angles[targetIdx] / 2;
     const desiredNorm = norm(-Math.PI / 2 - sectorCenter);
 
-    console.log(
-      '[LOCK2] Angle calc | sectorCenter:', (sectorCenter * 180 / Math.PI).toFixed(1) + ' deg',
-      '| desiredNorm:', (desiredNorm * 180 / Math.PI).toFixed(1) + ' deg'
-    );
-
-    // FIX: integer number of FULL rotations (2PI each)
-    const numRotations = 6 + Math.floor(Math.random() * 5); // 6..10
+    const numRotations = 6 + Math.floor(Math.random() * 5);
     const fullRotations = 2 * Math.PI * numRotations;
 
     const startAngle = angleRef.current;
@@ -272,17 +315,9 @@ export function Wheel({
     const deltaMod = norm(desiredNorm - startNorm);
     const targetAngle = startAngle + fullRotations + deltaMod;
 
-    console.log(
-      '[LOCK2] Target | startAngle:', (startNorm * 180 / Math.PI).toFixed(1) + ' deg',
-      '| rotations:', numRotations,
-      '| delta:', (deltaMod * 180 / Math.PI).toFixed(1) + ' deg',
-      '| targetAngle:', (norm(targetAngle) * 180 / Math.PI).toFixed(1) + ' deg (norm)'
-    );
-
     const duration = 3500 + Math.random() * 2500;
     const startTime = performance.now();
 
-    // ---- LOCK POINT 3: all animation values via refs/closure constants ----
     spinningRef.current = true;
     onSpinStart();
 
@@ -293,14 +328,13 @@ export function Wheel({
       const t = Math.min(elapsed / duration, 1);
       const eased = 1 - Math.pow(1 - t, 3);
 
-      // Uses only closure constants (startAngle, targetAngle) + ref (angleRef)
       const angle = startAngle + (targetAngle - startAngle) * eased;
       angleRef.current = angle;
       onAngleChange(angle);
       draw(angle);
 
+      // Tick sound: slower = more spaced out
       const speed = 1 - t;
-      // speed 1→0: tickGap 30→190, fast=密集 slow=稀疏
       const tickGap = 190 - speed * 160;
       if (elapsed - lastTick > tickGap) {
         playTick();
@@ -310,24 +344,15 @@ export function Wheel({
       if (t < 1) {
         animIdRef.current = requestAnimationFrame(animate);
       } else {
-        // ---- LOCK POINT 4: brake check ----
         spinningRef.current = false;
         frozenRef.current = null;
         angleRef.current = targetAngle;
 
         const finalNorm = norm(targetAngle);
-        const visualIndex = getIndexFromAngle(finalNorm, angles, snapshot);
+        const visualIndex = getIndexFromAngle(finalNorm, angles);
         const logicalIndex = resultIndexRef.current;
 
-        console.log(
-          '[LOCK4] Brake check | finalAngle:', (finalNorm * 180 / Math.PI).toFixed(1) + ' deg',
-          '| visualIndex:', visualIndex, '(' + snapshot[visualIndex]?.name + ')',
-          '| logicalIndex:', logicalIndex, '(' + snapshot[logicalIndex]?.name + ')',
-          visualIndex === logicalIndex ? '| MATCH' : '| MISMATCH — CORRECTING'
-        );
-
         if (visualIndex !== logicalIndex) {
-          // Force-correct: recompute the correct angle and redraw
           let correctAcc = 0;
           for (let i = 0; i < logicalIndex; i++) correctAcc += angles[i];
           const correctSectorCenter = correctAcc + angles[logicalIndex] / 2;
@@ -335,11 +360,9 @@ export function Wheel({
           const correctedAngle = startAngle + fullRotations + norm(correctedNorm - startNorm);
           angleRef.current = correctedAngle;
           draw(correctedAngle);
-          console.log('[LOCK4] Force-corrected to:', (norm(correctedAngle) * 180 / Math.PI).toFixed(1) + ' deg');
         }
 
         onAngleChange(angleRef.current);
-        // Pass the ID from the ref — never from closure
         onSpinEnd(resultIdRef.current!);
       }
     };

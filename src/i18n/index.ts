@@ -1,22 +1,20 @@
 const translations: Record<string, Record<string, string>> = {
-  // App
   appTitle: { zh: '转盘选择器', en: 'Wheel Spinner' },
   tabWheel: { zh: '转盘', en: 'Wheel' },
   tabOptions: { zh: '选项', en: 'Options' },
   tabHistory: { zh: '记录', en: 'History' },
+  tabSettings: { zh: '设置', en: 'Settings' },
   spinBtnSpinning: { zh: '转动中…', en: 'Spinning...' },
-  spinBtnNeedMore: { zh: '至少需要2个选项', en: 'Need 2+ options' },
+  spinBtnNeedMore: { zh: '至少需要 2 个选项', en: 'Need 2+ options' },
   spinBtnGo: { zh: '🎰 开始转动', en: '🎰 SPIN' },
   resultSelected: { zh: '选中：', en: 'Selected: ' },
   resultWeight: { zh: '权重', en: 'Weight' },
   muteOn: { zh: '开启声音', en: 'Unmute' },
   muteOff: { zh: '关闭声音', en: 'Mute' },
 
-  // Wheel
   wheelEmpty: { zh: '请添加选项', en: 'Add options' },
   wheelWeight: { zh: '权重', en: 'W' },
 
-  // OptionPanel
   optTitle: { zh: '选项列表', en: 'Options' },
   optAdd: { zh: '+ 添加', en: '+ Add' },
   optEmpty: { zh: '暂无选项，点击「添加」创建', en: 'No options yet, tap + Add' },
@@ -31,25 +29,36 @@ const translations: Record<string, Record<string, string>> = {
   optDelete: { zh: '删除', en: 'Delete' },
   optErrName: { zh: '名称不能为空', en: 'Name is required' },
   optErrWeight: { zh: '权重范围 1-10000', en: 'Weight must be 1-10000' },
+  optErrDup: { zh: '名称已存在', en: 'Name already exists' },
+  optLongPress: { zh: '长按编辑', en: 'Long press to edit' },
 
-  // ColorPicker
+  addTitle: { zh: '新增选项', en: 'Add Option' },
+  addConfirm: { zh: '确认添加', en: 'Confirm' },
+
   colorPick: { zh: '选择颜色', en: 'Select color' },
 
-  // HistoryPanel
-  // Settings
-  tabSettings: { zh: '设置', en: 'Settings' },
   settingsTitle: { zh: '设置', en: 'Settings' },
   settingsNoRepeat: { zh: '禁止连续重复', en: 'No consecutive repeats' },
   settingsNoRepeatDesc: { zh: '开启后相邻两次转盘不会选中同一选项', en: 'Prevents the same option from being selected twice in a row' },
   settingsBoost: { zh: '冷门补偿系数', en: 'Streak boost' },
   settingsBoostDesc: { zh: '选项未被选中时概率逐渐增加的幅度', en: 'How much probability increases each time an option is missed' },
   settingsBoostOff: { zh: '关闭', en: 'Off' },
+  settingsShowWeights: { zh: '显示转盘权重', en: 'Show weights on wheel' },
+  settingsShowWeightsDesc: { zh: '在转盘扇形内显示选项权重数值', en: 'Display weight value inside each sector' },
+
   histTitle: { zh: '历史记录', en: 'History' },
   histClear: { zh: '清空', en: 'Clear' },
   histEmpty: { zh: '暂无记录，转动转盘开始记录', en: 'No history yet. Spin to record.' },
   histWeight: { zh: '权重', en: 'Weight' },
   histPrev: { zh: '上一页', en: 'Prev' },
   histNext: { zh: '下一页', en: 'Next' },
+
+  wheelListTitle: { zh: '转盘列表', en: 'Wheels' },
+  wheelNew: { zh: '+ 新建转盘', en: '+ New Wheel' },
+  wheelNewTitle: { zh: '新建转盘', en: 'New Wheel' },
+  wheelNamePlaceholder: { zh: '输入转盘名称', en: 'Wheel name' },
+  wheelCreate: { zh: '创建', en: 'Create' },
+  wheelDeleteConfirm: { zh: '确定删除此转盘？', en: 'Delete this wheel?' },
 };
 
 export type Lang = 'zh' | 'en';
